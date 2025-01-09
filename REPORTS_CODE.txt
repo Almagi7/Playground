@@ -1,5 +1,5 @@
 function onFormSubmit() {
-    const docId = '1wu9lxhIhasILJQ0khlmWFccd3tqqJfdA6KTD9Trii8g';  // Cambia esto con el ID de tu documento
+    const docId = '00000000000000000000000000000000000000000000';  // Cambia esto con el ID de tu documento
 
     const doc = DocumentApp.openById(docId);
     const body = doc.getBody();
