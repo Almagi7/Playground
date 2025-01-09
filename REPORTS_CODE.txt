@@ -1,0 +1,171 @@
+function onFormSubmit() {
+    const docId = '1wu9lxhIhasILJQ0khlmWFccd3tqqJfdA6KTD9Trii8g';  // Cambia esto con el ID de tu documento
+
+    const doc = DocumentApp.openById(docId);
+    const body = doc.getBody();
+    body.clear();
+
+    const personas = [
+        { nombre: "Persona 1", area: "Área 1" },
+        { nombre: "Persona 2", area: "Área 2" },
+        { nombre: "Persona 3", area: "Área 3" },
+        { nombre: "Persona 4", area: "Área 4" },
+        { nombre: "Persona 5", area: "Área 5" },
+        { nombre: "Persona 6", area: "Área 6" },
+        { nombre: "Persona 7", area: "Área 7" },
+        { nombre: "Persona 8", area: "Área 8" },
+        { nombre: "Persona 9", area: "Área 9" },
+        { nombre: "Persona 10", area: "Área 10" },
+        { nombre: "Persona 11", area: "Área 11" },
+        { nombre: "Persona 12", area: "Área 12" },
+        { nombre: "Persona 13", area: "Área 13" }
+    ];
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respuestas de formulario 1');
+    const data = sheet.getDataRange().getValues();
+
+    const fecha = data[1][1];
+    const evaluador = data[1][2];
+
+ 
+    for (let p = 0; p < personas.length; p++) {
+        const persona = personas[p];
+
+
+        const baseIndex = 3 + p * 11;
+
+        if (p > 0) {
+            body.appendPageBreak();
+        }
+
+        const tabla = body.appendTable();
+        const filaEncabezado = tabla.appendTableRow();
+        const encabezado = ["Área", "Evaluador", "Calificación", "Fecha"];
+        
+        for (let j = 0; j < encabezado.length; j++) {
+            const cell = filaEncabezado.appendTableCell(encabezado[j]);
+            cell.setBackgroundColor('#0859A5');
+            cell.setForegroundColor('#FFFFFF');
+            cell.setBold(true);
+        }
+
+        const filaDatos = tabla.appendTableRow();
+        filaDatos.appendTableCell(persona.area);
+        filaDatos.appendTableCell(evaluador);
+        filaDatos.appendTableCell(calcularCalificacion(data[1][baseIndex], data[1][baseIndex + 2], data[1][baseIndex + 4], data[1][baseIndex + 6], data[1][baseIndex + 8]));
+        filaDatos.appendTableCell(fecha);
+
+        for (let j = 0; j < filaDatos.getNumChildren(); j++) {
+            const cell = filaDatos.getChild(j);
+            cell.setBackgroundColor('#FFFFFF');
+            cell.setForegroundColor('#000000');
+            cell.setFontSize(11);
+        }
+
+        // Agregar fila "Responsable"
+        const encargadoRow = body.appendTable();
+        const filaEncargado = encargadoRow.appendTableRow();
+        const encargadoCell = filaEncargado.appendTableCell("Responsable: " + persona.nombre);
+        encargadoCell.setFontSize(12);
+        encargadoCell.setBackgroundColor('#DDDDDD');
+        encargadoCell.setForegroundColor('#000000');
+        encargadoCell.setTextAlignment(DocumentApp.TextAlignment.NORMAL);
+
+        const filaAntes = encargadoRow.appendTableRow();
+        const antesCell = filaAntes.appendTableCell("Antes");
+        antesCell.setForegroundColor('#000000');
+
+        const paragraph = antesCell.getChild(0).asParagraph();
+        const cellStyle = {};
+        cellStyle[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.HorizontalAlignment.CENTER;
+        paragraph.setAttributes(cellStyle);
+        antesCell.setFontSize(12);
+        antesCell.setBackgroundColor('#FFFFFF');
+
+        if (data[1][baseIndex + 10]) {
+            try {
+                const imagenes = data[1][baseIndex + 10].split(',');
+                if (imagenes.length > 0) {
+                    const imagenesTable = body.appendTable();
+                    const imagenesRow1 = imagenesTable.appendTableRow();
+
+                    for (let j = 0; j < Math.min(2, imagenes.length); j++) {
+                        const imageUrl = "https://drive.google.com/uc?export=view&id=" + obtenerIdDeImagen(imagenes[j]);
+                        const response = UrlFetchApp.fetch(imageUrl);
+                        const imageBlob = response.getBlob();
+
+                        if (imageBlob.getBytes().length > 0) {
+                            const image = imagenesRow1.appendTableCell().appendImage(imageBlob);
+                            image.setWidth(300);
+                            image.setHeight(200);
+                        }
+                    }
+
+                    if (imagenes.length > 2) {
+                        const imagenesRow2 = imagenesTable.appendTableRow();
+
+                        for (let j = 2; j < Math.min(4, imagenes.length); j++) {
+                            const imageUrl = "https://drive.google.com/uc?export=view&id=" + obtenerIdDeImagen(imagenes[j]);
+                            const response = UrlFetchApp.fetch(imageUrl);
+                            const imageBlob = response.getBlob();
+
+                            if (imageBlob.getBytes().length > 0) {
+                                const image = imagenesRow2.appendTableCell().appendImage(imageBlob);
+                                image.setWidth(300);
+                                image.setHeight(200);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error al cargar las imágenes: ", error);
+                body.appendParagraph("Error al cargar las imágenes.");
+            }
+        }
+
+        const comentariosTexto = agregarComentariosNumerados(data[1][baseIndex + 1], data[1][baseIndex + 3], data[1][baseIndex + 5], data[1][baseIndex + 7], data[1][baseIndex + 9]);
+        const comentariosRow = body.appendTable();
+        const filaComentarios = comentariosRow.appendTableRow();
+        const comentariosCell = filaComentarios.appendTableCell("Comentarios:\n" + comentariosTexto);
+        comentariosCell.setForegroundColor('#000000');
+        comentariosCell.setFontSize(12);
+    }
+
+    doc.saveAndClose();
+}
+
+function calcularCalificacion(evalua1S, evalua2S, evalua3S, evalua4S, evalua5S) {
+    const promedio = (evalua1S + evalua2S + evalua3S + evalua4S + evalua5S) / 5;
+    return (promedio * 100 / 5).toFixed(2) + "%";
+}
+
+
+function obtenerIdDeImagen(url) {
+    let regex = /\/d\/(.*)\/view/;
+    let matches = url.match(regex);
+    if (matches) {
+        return matches[1];
+    }
+
+    regex = /(?:https:\/\/drive.google.com\/open\?id=)([^\/]+)/;
+    matches = url.match(regex);
+    return matches ? matches[1] : null;
+}
+
+function agregarComentariosNumerados(comentarios1S, comentarios2S, comentarios3S, comentarios4S, comentarios5S) {
+    const comentarios = [
+        { comentario: comentarios1S, numero: "1ra S" },
+        { comentario: comentarios2S, numero: "2da S" },
+        { comentario: comentarios3S, numero: "3ra S" },
+        { comentario: comentarios4S, numero: "4ta S" },
+        { comentario: comentarios5S, numero: "5ta S" }
+    ];
+
+    let comentariosTexto = "";
+    for (let i = 0; i < comentarios.length; i++) {
+        if (comentarios[i].comentario) {
+            comentariosTexto += comentarios[i].numero + ": " + comentarios[i].comentario + "\n";
+        }
+    }
+    return comentariosTexto;
+}
